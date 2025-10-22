@@ -11,9 +11,9 @@ def set_terminal_color():
     """Меняет цвет терминала на зеленый (Windows)"""
     try:
         if os.name == 'nt':  # Windows
-            os.system('color c')  # Зеленый на черном
+            os.system('color c')  # красный цвет
         else:  # Linux/Mac
-            print('\033[32m')  # Зеленый цвет
+            print('\033[32m')  # 
     except:
         pass  # Если не получается - не беда
 
