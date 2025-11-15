@@ -41,63 +41,89 @@ async def run_bot(config):
         print("❌ Ошибка: api_id, api_hash, phone_number обязательны!")
         sys.exit(1)
     
-    # Параметры отправки сообщений
-    send_enabled = config.get('send_enabled', False)
-    target_chat = config.get('target_chat')
-    message_text = config.get('message')
-    message_file = config.get('message_file')
-    interval_seconds = config.get('interval_seconds', 3600)
-    
-    # Параметры пересылки входящих
-    forward_enabled = config.get('forward_enabled', False)
+    # Загружаем конфигурацию для проверки доступности режимов
+    chats_config = config.get('chats', [])
     forward_to = config.get('forward_to')
     
-    # Загружаем сообщения (один файл или папка с несколькими)
-    messages_list = []
+    # Интерактивный выбор режима работы
+    print("\n" + "="*60)
+    print("🤖 Выберите режим работы:")
+    print("="*60)
+    print("1️⃣  Только рассылка сообщений")
+    print("2️⃣  Только пересылка входящих сообщений")
+    print("3️⃣  Вместе (рассылка + пересылка)")
+    print("="*60)
     
-    if message_file:
-        # Проверяем - это файл или папка?
-        if os.path.isdir(message_file):
-            # Это папка - загружаем все .txt файлы
-            try:
-                txt_files = sorted([f for f in os.listdir(message_file) if f.endswith('.txt')])
-                for txt_file in txt_files:
-                    file_path = os.path.join(message_file, txt_file)
-                    with open(file_path, 'r', encoding='utf-8') as f:
+    while True:
+        choice = input("\n👉 Ваш выбор (1/2/3): ").strip()
+        
+        if choice == '1':
+            # Только рассылка
+            if not chats_config:
+                print("❌ Ошибка: для рассылки нужен массив 'chats' в конфиге")
+                sys.exit(1)
+            send_enabled = True
+            forward_enabled = False
+            print("✅ Выбран режим: Только рассылка")
+            break
+            
+        elif choice == '2':
+            # Только пересылка
+            if not forward_to:
+                print("❌ Ошибка: для пересылки нужен 'forward_to' в конфиге")
+                sys.exit(1)
+            send_enabled = False
+            forward_enabled = True
+            print("✅ Выбран режим: Только пересылка")
+            break
+            
+        elif choice == '3':
+            # Вместе
+            if not chats_config:
+                print("❌ Ошибка: для рассылки нужен массив 'chats' в конфиге")
+                sys.exit(1)
+            if not forward_to:
+                print("❌ Ошибка: для пересылки нужен 'forward_to' в конфиге")
+                sys.exit(1)
+            send_enabled = True
+            forward_enabled = True
+            print("✅ Выбран режим: Рассылка + Пересылка")
+            break
+            
+        else:
+            print("❌ Введите 1, 2 или 3")
+    
+    # Функция загрузки сообщений
+    def load_messages(message_file=None, message_text=None):
+        """Загружает сообщения из файла или папки"""
+        messages_list = []
+        
+        if message_file:
+            if os.path.isdir(message_file):
+                try:
+                    txt_files = sorted([f for f in os.listdir(message_file) if f.endswith('.txt')])
+                    for txt_file in txt_files:
+                        file_path = os.path.join(message_file, txt_file)
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read().strip()
+                            if content:
+                                messages_list.append(content)
+                except Exception as e:
+                    print(f"❌ Ошибка чтения папки '{message_file}': {e}")
+            else:
+                try:
+                    with open(message_file, 'r', encoding='utf-8') as f:
                         content = f.read().strip()
                         if content:
                             messages_list.append(content)
-                print(f"✅ Загружено {len(messages_list)} сообщений из папки '{message_file}'")
-            except Exception as e:
-                print(f"❌ Ошибка чтения папки '{message_file}': {e}")
-        else:
-            # Это файл - загружаем как обычно
-            try:
-                with open(message_file, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                    if content:
-                        messages_list.append(content)
-            except Exception as e:
-                print(f"❌ Ошибка чтения файла '{message_file}': {e}")
-    elif message_text:
-        messages_list.append(message_text)
+                except Exception as e:
+                    print(f"❌ Ошибка чтения файла '{message_file}': {e}")
+        elif message_text:
+            messages_list.append(message_text)
+        
+        return messages_list
     
-    # Режим ротации
-    rotation_mode = config.get('rotation_mode', 'sequential')  # sequential или random
-    current_message_index = 0
-    
-    # Проверка режимов
-    if not send_enabled and not forward_enabled:
-        print("❌ Включите хотя бы один режим: send_enabled или forward_enabled")
-        sys.exit(1)
-    
-    if send_enabled and not all([target_chat, (message_text or messages_list)]):
-        print("❌ Для отправки нужны: target_chat и message (или message_file)")
-        sys.exit(1)
-    
-    if forward_enabled and not forward_to:
-        print("❌ Для пересылки нужен: forward_to")
-        sys.exit(1)
+    # Проверки уже выполнены выше при выборе режима
     
     # Создаем клиент с увеличенными таймаутами
     session_name = config.get('session_name', 'session')
@@ -154,32 +180,40 @@ async def run_bot(config):
             except Exception as e:
                 print(f"❌ Ошибка пересылки: {e}")
     
-    # Функция периодической отправки
-    async def send_periodically():
-        """Отправляет сообщения с интервалом"""
-        if not send_enabled:
+    # Функция периодической отправки для одного чата
+    async def send_to_chat(chat_config, chat_index):
+        """Отправляет сообщения в конкретный чат с заданным интервалом"""
+        target_chat = chat_config.get('target_chat')
+        message_file = chat_config.get('message_file')
+        message_text = chat_config.get('message')
+        rotation_mode = chat_config.get('rotation_mode', 'sequential')
+        interval_seconds = chat_config.get('interval_seconds', 3600)
+        
+        # Загружаем сообщения для этого чата
+        messages_list = load_messages(message_file, message_text)
+        
+        if not messages_list:
+            print(f"❌ Чат #{chat_index + 1}: нет сообщений для отправки")
             return
         
-        nonlocal current_message_index
+        print(f"✅ Чат #{chat_index + 1} ({target_chat}): загружено {len(messages_list)} сообщений")
+        
+        current_message_index = 0
         current_interval = interval_seconds
         
         while True:
             try:
                 # Выбираем сообщение для отправки
-                if messages_list:
-                    if rotation_mode == 'random':
-                        current_text = random.choice(messages_list)
-                        print(f"📤 Отправка сообщения (случайное из {len(messages_list)}) в '{target_chat}'...")
-                    else:  # sequential
-                        current_text = messages_list[current_message_index]
-                        print(f"📤 Отправка сообщения ({current_message_index + 1}/{len(messages_list)}) в '{target_chat}'...")
-                        current_message_index = (current_message_index + 1) % len(messages_list)
-                else:
-                    current_text = message_text
-                    print(f"📤 Отправка сообщения в '{target_chat}'...")
+                if rotation_mode == 'random':
+                    current_text = random.choice(messages_list)
+                    print(f"📤 Чат #{chat_index + 1} → {target_chat}: отправка (случайное из {len(messages_list)})")
+                else:  # sequential
+                    current_text = messages_list[current_message_index]
+                    print(f"📤 Чат #{chat_index + 1} → {target_chat}: отправка ({current_message_index + 1}/{len(messages_list)})")
+                    current_message_index = (current_message_index + 1) % len(messages_list)
                 
                 await client.send_message(target_chat, current_text)
-                print(f"✅ Отправлено! Следующая отправка через {current_interval} сек.")
+                print(f"✅ Чат #{chat_index + 1}: отправлено! Следующая через {current_interval} сек.")
                 
                 # Сбрасываем интервал на исходный после успешной отправки
                 current_interval = interval_seconds
@@ -188,14 +222,14 @@ async def run_bot(config):
             except FloodWaitError as e:
                 # Telegram требует подождать - адаптируем интервал
                 wait_time = e.seconds
-                print(f"⏳ FloodWait: требуется подождать {wait_time} секунд...")
-                print(f"🔄 Адаптирую интервал: {interval_seconds} → {wait_time + 60} сек")
+                print(f"⏳ Чат #{chat_index + 1}: FloodWait {wait_time} сек...")
+                print(f"🔄 Чат #{chat_index + 1}: адаптирую интервал {interval_seconds} → {wait_time + 60} сек")
                 
                 current_interval = wait_time + 60  # Добавляем буфер 60 сек
                 await asyncio.sleep(wait_time)
                 
             except Exception as e:
-                print(f"❌ Ошибка отправки: {e}")
+                print(f"❌ Чат #{chat_index + 1}: ошибка отправки: {e}")
                 await asyncio.sleep(current_interval)
     
     try:
@@ -211,7 +245,10 @@ async def run_bot(config):
         print()
         
         if send_enabled:
-            print(f"📤 Отправка: ВКЛЮЧЕНА → {target_chat} (каждые {interval_seconds} сек)")
+            print(f"📤 Отправка: ВКЛЮЧЕНА ({len(chats_config)} чатов)")
+            for idx, chat in enumerate(chats_config):
+                interval = chat.get('interval_seconds', 3600)
+                print(f"   Чат #{idx + 1}: {chat.get('target_chat')} (каждые {interval} сек)")
         else:
             print(f"📤 Отправка: ВЫКЛЮЧЕНА")
         
@@ -225,22 +262,21 @@ async def run_bot(config):
         print("="*60)
         print()
         
-        # Запускаем обе задачи параллельно
+        # Запускаем задачи параллельно
         tasks = []
         
+        # Создаем задачу для каждого чата
         if send_enabled:
-            tasks.append(asyncio.create_task(send_periodically()))
+            for idx, chat_config in enumerate(chats_config):
+                task = asyncio.create_task(send_to_chat(chat_config, idx))
+                tasks.append(task)
         
+        # Добавляем форвардер если включен
         if forward_enabled:
-            # Форвардер работает через events, просто ждем
             tasks.append(asyncio.create_task(client.run_until_disconnected()))
-        else:
-            # Если только отправка, просто ждем задачу
-            if tasks:
-                await tasks[0]
         
-        # Ждем выполнения задач
-        if len(tasks) > 1:
+        # Ждем выполнения всех задач
+        if tasks:
             await asyncio.gather(*tasks)
         
     except KeyboardInterrupt:

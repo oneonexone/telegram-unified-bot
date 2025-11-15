@@ -1,19 +1,12 @@
-# Файлы конфигурации с секретами
+# Конфигурация с секретами
 config.json
 
-# Файлы сессий Telegram
+# Сессии Telegram
 *.session
 *.session-journal
 
-# Сообщения (могут содержать личные данные)
+# Папка с сообщениями
 messages/
-
-# Docker data directory
-data/
-
-# Логи
-*.log
-telegram_bot.log
 
 # Python
 __pycache__/
@@ -50,4 +43,7 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Логи
+*.log
 

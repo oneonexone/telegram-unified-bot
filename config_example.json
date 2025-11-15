@@ -1,20 +1,20 @@
 {
-  "_comment": "=== ОСНОВНЫЕ НАСТРОЙКИ (ОБЯЗАТЕЛЬНО) ===",
   "api_id": 12345678,
-  "api_hash": "your_api_hash",
-  "phone_number": "+79991234567",
+  "api_hash": "your_api_hash_here",
+  "phone_number": "+1234567890",
   "session_name": "session",
   
-  "_comment2": "=== ОТПРАВКА СООБЩЕНИЙ (включить: true, выключить: false) ===",
   "send_enabled": true,
-  "target_chat": "@username",
-  "message_file": "messages",
-  "rotation_mode": "sequential",
-  "interval_seconds": 3600,
+  "chats": [
+    {
+      "target_chat": "https://t.me/example_chat",
+      "message_file": "messages/example-chat",
+      "rotation_mode": "sequential",
+      "interval_seconds": 3600
+    }
+  ],
   
-  "_comment3": "=== ПЕРЕСЫЛКА ВХОДЯЩИХ напрямую (включить: true, выключить: false) ===",
-  "forward_enabled": true,
-  "forward_to": "@your_second_account"
+  "forward_enabled": false,
+  "forward_to": "@username_or_me"
 }
-
 
