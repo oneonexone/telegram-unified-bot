@@ -8,7 +8,7 @@ import argparse
 import random
 
 def set_terminal_color():
-    """Меняет цвет терминала на зеленый (Windows)"""
+    """Меняет цвет терминала на красный (Windows)"""
     try:
         if os.name == 'nt':  # Windows
             os.system('color c')  # красный цвет
